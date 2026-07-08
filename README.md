@@ -68,6 +68,19 @@ tanımlarınız değildir.
 go test ./...        # birim testler (connector/manifest/expression/toolserver/audit/…)
 ```
 
+## Yol haritası (gelecek eklemeler)
+Aşağıdakiler planlanıyor — öncelik/zamanlama değişebilir. **Önerinizi, isteğinizi veya sorununuzu
+[Issues](https://github.com/dc-nextgen/chimera-masha/issues)'dan iletebilirsiniz;** geri bildiriminiz
+önceliklendirmemize yardımcı olur.
+- **Otomatik güncelleme** — yeni sürüm çıktığında ajanı güvenli şekilde güncelleme (önce "güncelle"
+  bildirimi/onayı, sonra tam otomatik).
+- **Arka-plan servisi** — Windows Service / macOS launchd / Linux systemd olarak kurulum (yeniden
+  başlatmaya dayanıklı).
+- **İmzalı ikili dosyalar** — kod imzalama (indirdiğinizin doğruluğunu ek olarak garanti eder).
+- **Daha fazla veritabanı** — MSSQL yanında PostgreSQL, MySQL ve diğer kaynaklar.
+- **Dosya/doküman bağlayıcı** — bir klasörü/paylaşımı izleyip belgelerle sohbet (salt-okunur).
+- **Şema→araç önerisi** — LLM destekli onboarding (veritabanınızı anlayıp araç taslağı önerir).
+
 ## Lisans
 Apache-2.0 — bkz [`LICENSE`](./LICENSE). Değerimiz kurulum + bakım hizmetindedir; ajanı okumakta,
 derlemekte, denetlemekte özgürsünüz.
