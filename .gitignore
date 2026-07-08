@@ -1,0 +1,21 @@
+# derlenmis binary (release'de imzasiz dagitilir; repoya girmez)
+/masha-agent
+/masha-agent.exe
+*.out
+
+# yerel test DB kimligi (ASLA commit edilmez)
+/.env.test
+
+# musteriye-ozel manifestler (sema=bulutta yasar, repoya girmez)
+/manifests/
+
+# yerel yuz self-signed TLS cert/key (kutuda uretilir, repoya girmez)
+/.masha-webtls/
+
+# ekrandan girilen DB / ErpNext kimligi (YEREL kalir, ASLA commit edilmez; Faz 3: keychain)
+/.masha-db.json
+/.masha-erpnext.json
+run-live.sh
+.masha.env
+masha.log
+dist-bundle/

@@ -1,0 +1,42 @@
+{
+  "name": "ornek-mssql",
+  "label": "Ornek MSSQL (salt-okunur)",
+  "erp_kind": "mssql-generic",
+  "prompt": "prompt.md",
+  "db": { "driver": "sqlserver", "read_only": true },
+  "entities": {
+    "invoice": {
+      "table": "dbo.Invoices",
+      "fields": {
+        "id": { "column": "InvoiceID" },
+        "date": { "column": "InvoiceDate", "expression": "format:date" },
+        "customer": { "column": "CustomerName" },
+        "total": { "column": "Total", "expression": "format:money" },
+        "tax_id": { "column": "TaxNumber", "expression": "mask:tckn" }
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "count_invoices",
+      "kind": "count",
+      "entity": "invoice",
+      "description": "Fatura sayisini dondurur (opsiyonel tarih araligi).",
+      "filters": [
+        { "name": "start_date", "field": "date", "op": ">=" },
+        { "name": "end_date", "field": "date", "op": "<=" }
+      ]
+    },
+    {
+      "name": "list_invoices",
+      "kind": "query",
+      "entity": "invoice",
+      "description": "Faturalari listeler (opsiyonel musteri filtresi).",
+      "select": ["id", "date", "customer", "total", "tax_id"],
+      "filters": [
+        { "name": "customer", "field": "customer", "op": "like" }
+      ],
+      "limit": 50
+    }
+  ]
+}
