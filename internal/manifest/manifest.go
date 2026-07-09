@@ -3,7 +3,7 @@
 // setup/connectors/<name>/manifest.json desenini DB connector icin genisletir:
 // entities (tablo->is-varligi eslemesi) + tools (tipli arac yuzu) + per-alan expression.
 // Bu dosya connector'un TEK "ne yapabilir" kaynagidir; agent asla serbest SQL calistirmaz,
-// yalniz burada tanimli araclardan PARAMETRELI SELECT uretir.
+// yalniz burada tanimli araclardan PARAMETRELI SELECT uretir (docs/masha-plan.md §17).
 package manifest
 
 import (

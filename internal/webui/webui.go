@@ -19,13 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dc-nextgen/chimera-masha/internal/audit"
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/connector/erpnext"
-	"github.com/dc-nextgen/chimera-masha/internal/live"
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
-	"github.com/dc-nextgen/chimera-masha/internal/onboard"
-	"github.com/dc-nextgen/chimera-masha/internal/registry"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/audit"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/erpnext"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/live"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/onboard"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/registry"
 )
 
 type UI struct {
@@ -51,6 +51,9 @@ type UI struct {
 	primaryLabel string
 	// plan — satis yuzeyi (Plan/Yukselt ekrani): deneme rozeti + iletisim/talep. Bos = normal.
 	plan Plan
+	// version — ajan surumu (main.go main.version). /healthz'e yansir (yerel yuz teşhisi; OpenAPI
+	// info.version = TEK diger kaynak, manifest.AgentVersion — Pota tunelden onu okur).
+	version string
 }
 
 // Plan — yerel yuz "Plan/Yukselt" ekrani icin config (deneme durumu + talep kanali).
@@ -75,12 +78,13 @@ type Deps struct {
 	ErpnextConnect func(erpnext.Fields) error
 	PrimaryLabel   string
 	Plan           Plan
+	Version        string
 }
 
 func New(d Deps) *UI {
 	return &UI{man: d.Live, conn: d.Conn, aud: d.Aud, static: d.Static, apply: d.Apply,
 		adviser: d.Adviser, auth: newAuth(d.Password), dbConnect: d.DBConnect, reg: d.Registry,
-		erpnextConnect: d.ErpnextConnect, primaryLabel: d.PrimaryLabel, plan: d.Plan}
+		erpnextConnect: d.ErpnextConnect, primaryLabel: d.PrimaryLabel, plan: d.Plan, version: d.Version}
 }
 
 // connFor — istekteki ?conn=<label> bağlantısı (yoksa primary). Per-connection op scoping.
@@ -197,7 +201,7 @@ func (u *UI) auditHead() string {
 
 func (u *UI) healthz(w http.ResponseWriter, r *http.Request) {
 	m := u.man.Get()
-	resp := map[string]any{"ok": true, "db": u.dbOK(), "audit_head": u.auditHead()}
+	resp := map[string]any{"ok": true, "db": u.dbOK(), "audit_head": u.auditHead(), "version": u.version}
 	if m != nil {
 		resp["connector"], resp["erp_kind"], resp["tools"] = m.Name, m.ERPKind, m.ToolNames()
 	}

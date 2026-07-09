@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 // OutCol — sonuc sekillendirme + expression icin cikti kolonu tanimi.

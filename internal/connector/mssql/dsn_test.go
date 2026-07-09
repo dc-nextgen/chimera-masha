@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
 )
 
 func TestBuildDSNEncodesSpecialPassword(t *testing.T) {

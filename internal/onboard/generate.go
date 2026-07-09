@@ -1,4 +1,4 @@
-// Package onboard — "veritabanini anla → MCP uret".
+// Package onboard — "veritabanini anla → MCP uret" (docs/masha-plan.md §17.3, Faz 2).
 //
 // Sema YAPISINDAN (connector.Schema; SATIR YOK) bir ADAY manifest uretir: tablo→entity,
 // kolon→field, count_/list_ tipli araclar + kolon-adi/tip heuristigiyle PII maske / tarih-para format.
@@ -10,9 +10,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/expression"
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/expression"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 // Selection — operatorun onboarding secimi. Tables bos => tum tablolar.

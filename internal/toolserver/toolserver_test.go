@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
-	"github.com/dc-nextgen/chimera-masha/internal/registry"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/registry"
 )
 
 type fakeConn struct {

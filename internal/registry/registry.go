@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
 )
 
 // Connection — bir bağlantı: ad/etiket + kind (mssql|erpnext|…) + server_label (yol/OWUI tool_id) + backend.

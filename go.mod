@@ -1,4 +1,4 @@
-module github.com/dc-nextgen/chimera-masha
+module github.com/mehmetor/chimera-ai/stack/masha/agent
 
 go 1.26
 

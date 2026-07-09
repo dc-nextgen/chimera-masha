@@ -1,6 +1,6 @@
 // Package expression — per-alan donusum (maske/format), ON-PREM, tunelden ONCE uygulanir.
 //
-// alan degeri buluta gitmeden once donusturulur. Maskeleme
+// docs/masha-plan.md §17.7/§17.8: alan degeri buluta gitmeden once donusturulur. Maskeleme
 // at-source ve DETERMINISTIK (regex pii-sanitizer'dan daha kesin: kolonun TC oldugu BILINIR).
 // SQL-expression (bir kolonda tutulan SQL) ERTELENDI — burada YOK.
 package expression

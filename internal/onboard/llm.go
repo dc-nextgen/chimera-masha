@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
 )
 
 // FieldAdvice — kolon icin onerilen expression (maske/format; bos=donusum yok).

@@ -10,9 +10,9 @@ import (
 
 	_ "github.com/microsoft/go-mssqldb" // "sqlserver" driver kaydi
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/expression"
-	"github.com/dc-nextgen/chimera-masha/internal/live"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/expression"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/live"
 )
 
 // Connector — SQL Server DB connector. db salt-okuma login ile acilmali (savunma katmani 1;

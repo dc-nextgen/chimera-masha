@@ -3,8 +3,8 @@ package mssql
 import (
 	"testing"
 
-	"github.com/dc-nextgen/chimera-masha/internal/live"
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/live"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 func toolsMan() *manifest.Manifest {

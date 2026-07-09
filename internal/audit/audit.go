@@ -1,6 +1,6 @@
 // Package audit — hash-ZINCIRLI denetim kaydi (tamper-evident).
 //
-// telemetry.py hash-zincir mantiginin Go portu. Her kayit
+// telemetry.py hash-zincir mantiginin Go portu (docs/masha-plan.md §12/§15). Her kayit
 // prev-hash'e baglanir: hash = sha256(prev_hash + canonical_json(rec)). Zincir kirilirsa
 // (silme/degistirme) sonraki dogrulama fark eder. Faz 1 = yerel dosya + stdout; off-box
 // akitma (collector) Faz 2.

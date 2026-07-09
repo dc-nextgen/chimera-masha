@@ -1,6 +1,6 @@
 // Command masha-agent — on-prem DB connector ajani (Go tek-binary, arka-plan servis).
 //
-// Zincir: bulut OWUI → tunel → [bu agent: toolserver → mssql connector] → SQL Server.
+// Zincir (docs/masha-plan.md §17): bulut OWUI → tunel → [bu agent: toolserver → mssql connector] → SQL Server.
 // MCP yurutmesi BURADA (kutuda); tanim (manifest) bulutta uretilir, iner. Ham satir kutuda kalir.
 //
 // Komutlar:
@@ -27,22 +27,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dc-nextgen/chimera-masha/internal/audit"
-	"github.com/dc-nextgen/chimera-masha/internal/config"
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/connector/erpnext"
-	"github.com/dc-nextgen/chimera-masha/internal/connector/mssql"
-	"github.com/dc-nextgen/chimera-masha/internal/live"
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
-	"github.com/dc-nextgen/chimera-masha/internal/onboard"
-	"github.com/dc-nextgen/chimera-masha/internal/registry"
-	"github.com/dc-nextgen/chimera-masha/internal/selfcert"
-	"github.com/dc-nextgen/chimera-masha/internal/toolserver"
-	"github.com/dc-nextgen/chimera-masha/internal/tunnel"
-	"github.com/dc-nextgen/chimera-masha/internal/webui"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/audit"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/config"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/erpnext"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/mssql"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/live"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/onboard"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/registry"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/selfcert"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/toolserver"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/tunnel"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/webui"
 )
 
-const version = "0.1.0-faz1"
+// Sürüm: SemVer ön-sürüm (0.x = stabil değil + 'beta' = müşteri erken-erişim). Her build ayırt edilebilir → takip.
+// var (const değil) — build-binaries.sh ileride `-ldflags -X main.version=$(git describe)` ile damgalar (tag varsa);
+// tag yoksa bu default kalır. Stabilleşince 0.1.0, üretim-hazır olunca 1.0.0.
+var version = "0.1.0-beta.1"
 
 // Yerel web yuz (React+shadcn, web/) binary'ye GOMULU → tek-binary korunur, ayri sunucu yok.
 // `make build` (veya npm run build) web/dist'i uretir; go build gomer.
@@ -213,6 +216,7 @@ func runIntrospect() {
 }
 
 func runServe() {
+	manifest.SetVersion(version) // OpenAPI info.version + /healthz TEK kaynak (build-binaries.sh ldflags damgalarsa o)
 	cfg, _ := config.Load()
 	if err := cfg.RequireServe(); err != nil {
 		log.Fatalf("FATAL: %v", err) // kimlik-doğrulamasiz/manifest'siz acilmaz
@@ -315,7 +319,7 @@ func runServe() {
 	web := &http.Server{Addr: cfg.WebAddr, Handler: webui.New(webui.Deps{
 		Live: lm, Conn: conn, Aud: aud, Static: webUIFS(), Apply: apply,
 		Adviser: adviser, Password: cfg.WebPassword, DBConnect: dbConnect, Registry: reg,
-		ErpnextConnect: erpnextConnect, PrimaryLabel: cfg.ServerLabel,
+		ErpnextConnect: erpnextConnect, PrimaryLabel: cfg.ServerLabel, Version: version,
 		Plan: webui.Plan{Plan: cfg.Plan, TrialLimitUSD: cfg.TrialLimitUSD,
 			ContactEmail: cfg.ContactEmail, RequestURL: cfg.RequestURL},
 	}).Handler(), ReadHeaderTimeout: 10 * time.Second}

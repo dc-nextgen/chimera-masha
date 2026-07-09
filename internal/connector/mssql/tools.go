@@ -1,6 +1,10 @@
 package mssql
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
+)
 
 // writeVerbs — belt-and-suspenders: tool adinda bu fiiller varsa ASLA gecmez (savunma tabani;
 // manifest zaten yalniz count/query uretir, ama isim-bazli guard ek katman).
@@ -13,7 +17,7 @@ func (c *Connector) OpenAPI(serverLabel string) map[string]any {
 	if m == nil {
 		return map[string]any{
 			"openapi": "3.1.0",
-			"info":    map[string]any{"title": serverLabel, "version": "1.0.0"},
+			"info":    map[string]any{"title": serverLabel, "version": manifest.AgentVersion},
 			"servers": []any{map[string]any{"url": "/" + serverLabel}},
 			"paths":   map[string]any{},
 		}

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api, type PlanInfo } from '@/lib/api'
 
-// Ücretsiz (deneme) ↔ ücretli özellik haritası. ÖNERİ — operatör/ürün ayarlar.
+// Ücretsiz (deneme) ↔ ücretli özellik haritası. ÖNERİ — operatör/ürün ayarlar (docs/cloud-saas §13.3).
 const FEATURES: { label: string; free: boolean; note?: string }[] = [
   { label: 'Bir veri kaynağı bağla (SQL Server / ErpNext)', free: true },
   { label: 'Temel araçlar — say, listele (salt-okuma)', free: true },

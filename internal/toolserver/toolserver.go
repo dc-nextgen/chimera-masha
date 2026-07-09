@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dc-nextgen/chimera-masha/internal/audit"
-	"github.com/dc-nextgen/chimera-masha/internal/registry"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/audit"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/registry"
 )
 
 type Server struct {

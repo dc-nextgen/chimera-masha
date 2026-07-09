@@ -7,8 +7,9 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
-	"github.com/dc-nextgen/chimera-masha/internal/expression"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/expression"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 // maskAny — ErpNext dokümanının PII alanlarını (ad heuristigi) YERİNDE maskele; nested (child tablo)
@@ -208,7 +209,7 @@ func (c *Connector) OpenAPI(serverLabel string) map[string]any {
 	}
 	return map[string]any{
 		"openapi": "3.1.0",
-		"info": map[string]any{"title": "Chimera Masha ErpNext (salt-okunur)", "version": "1.0.0",
+		"info": map[string]any{"title": "Chimera Masha ErpNext (salt-okunur)", "version": manifest.AgentVersion,
 			"description": "ErpNext REST connector (Go-native, salt-okunur)."},
 		"servers": []any{map[string]any{"url": "/" + serverLabel}},
 		"paths":   paths,

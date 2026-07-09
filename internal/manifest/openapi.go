@@ -1,5 +1,18 @@
 package manifest
 
+// AgentVersion — ajan surumu, TEK kaynak: OpenAPI info.version (Pota tunelden bunu okur, ek
+// endpoint gerekmez) + /healthz. main.go build() sirasinda SetVersion ile enjekte eder (ldflags
+// -X main.version=<git-describe> varsa o; yoksa main.go'daki default). Bu default main.go'daki
+// `var version` ile AYNI tutulmali (main SetVersion cagirmadan bir yol calisirsa bile tutarli).
+var AgentVersion = "0.1.0-beta.1"
+
+// SetVersion — main.go enjekte eder. Bos gecilirse dokunmaz (default korunur).
+func SetVersion(v string) {
+	if v != "" {
+		AgentVersion = v
+	}
+}
+
 // OpenAPI — manifest'ten OWUI'nin okuyabilecegi OpenAPI 3.1 dokumani. mcpo'nun urettigi yuzeyi
 // elle sunar: her tool = POST /<tool>, requestBody = filtre parametreleri. OWUI tool-server olarak kaydeder.
 // (Eskiden toolserver.BuildOpenAPI; connector'a tasindi ki registry cok-connector'u desteklesin.)
@@ -56,7 +69,7 @@ func (m *Manifest) OpenAPI(label string) map[string]any {
 		"openapi": "3.1.0",
 		"info": map[string]any{
 			"title":       title,
-			"version":     "1.0.0",
+			"version":     AgentVersion,
 			"description": "Chimera Masha DB connector (salt-okunur) — " + m.ERPKind,
 		},
 		"servers": []any{map[string]any{"url": "/" + label}},

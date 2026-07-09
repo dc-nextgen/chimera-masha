@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 func testManifest() *manifest.Manifest {

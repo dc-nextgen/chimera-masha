@@ -1,6 +1,6 @@
 // Package live — calisan manifest'in TEK atomik kaynagi. Onboarding "apply" bir kez Set()
 // eder → connector (Call), toolserver (allowlist + openapi) ve webui (durum) AYNI ANDA yeni
-// manifest'i gorur. Hot-reload (restart'siz yeniden-yapilandirma) icin.
+// manifest'i gorur. Hot-reload (restart'siz yeniden-yapilandirma) icin (docs/masha-plan.md §18 Faz 2).
 //
 // atomic.Pointer → kilitsiz okuma (her arac cagrisi Get()), nadir yazma (apply).
 package live
@@ -8,7 +8,7 @@ package live
 import (
 	"sync/atomic"
 
-	"github.com/dc-nextgen/chimera-masha/internal/manifest"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 )
 
 type Manifest struct {

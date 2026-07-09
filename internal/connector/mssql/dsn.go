@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dc-nextgen/chimera-masha/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
 )
 
 // BuildDSN — ekran alanlarindan go-mssqldb DSN'i (URL form, net/url ile DOGRU encode → parola
