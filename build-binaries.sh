@@ -8,6 +8,10 @@
 #   MASHA_BIN_DIR     çıktı klasörü (default: ./dist-bin)
 #   MASHA_VERSION     sürüm ELLE override (default: `git describe --tags --dirty`; tag YOKSA damgasız build —
 #                     binary main.go'daki `var version` default'unu bildirir; ikisi de TUTARLI, aşağıya bkz.)
+#   MASHA_SIGN_IDENTITY   (ops, yalnız darwin) codesign Developer ID kimliği — set edilirse darwin binary'si
+#                         imzalanır; set DEĞİLSE mevcut davranış (imzasız build) sessizce korunur.
+#   MASHA_NOTARY_PROFILE  (ops, MASHA_SIGN_IDENTITY ile birlikte) notarytool keychain profile — set edilirse
+#                         imzadan sonra notarize de yapılır (assemble-tenant.sh install.sh'teki xattr ARA ÇÖZÜMÜ'nün yerini alır).
 #
 # Çıktı: $MASHA_BIN_DIR/masha-agent-<os>-<arch>[.exe] (her hedef için; sürüm VARSA -ldflags -X main.version=
 # ile DAMGALI) + $MASHA_BIN_DIR/VERSION (binary'nin GERÇEKTE bildireceği sürümle TUTARLI — Pota bunu OpenAPI
@@ -49,6 +53,21 @@ for T in $TARGETS; do
   echo "▸ $GOOS/$GOARCH → $OUT"
   go_build "$GOOS" "$GOARCH" "$OUT" \
     || { echo "  ✗ go build ($GOOS/$GOARCH) başarısız"; exit 1; }
+
+  if [ "$GOOS" = "darwin" ] && [ -n "${MASHA_SIGN_IDENTITY:-}" ]; then
+    echo "  ▸ codesign ($MASHA_SIGN_IDENTITY)…"
+    # Developer ID ile imzala (hardened runtime + güvenli zaman damgası)
+    codesign --force --options runtime --timestamp --sign "$MASHA_SIGN_IDENTITY" "$OUT"
+    codesign --verify --strict --verbose=2 "$OUT"
+    if [ -n "${MASHA_NOTARY_PROFILE:-}" ]; then
+      echo "  ▸ notarize ($MASHA_NOTARY_PROFILE)…"
+      # notarize — çıplak binary staple EDİLEMEZ; ilk açılışta çevrimiçi Gatekeeper kontrolü yapılır.
+      _nz="${OUT}.notarize.zip"
+      ditto -c -k "$OUT" "$_nz"
+      xcrun notarytool submit "$_nz" --keychain-profile "$MASHA_NOTARY_PROFILE" --wait
+      rm -f "$_nz"
+    fi
+  fi
 done
 
 echo

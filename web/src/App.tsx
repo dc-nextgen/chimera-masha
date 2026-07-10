@@ -116,6 +116,14 @@ export default function App() {
               )}
             </div>
           </header>
+          {health?.tunnel === 'conflict' && (
+            <div className="flex items-start gap-3 border-b border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-800 dark:text-rose-300">
+              <span aria-hidden>⚠</span>
+              <span>
+                <b>Tünel çatışması:</b> {health.tunnel_msg || 'Bu bağlantı slotu başka bir makinede aktif.'}
+              </span>
+            </div>
+          )}
           <main className="flex-1 p-4 md:p-6">
             <ErrorBoundary>
               {wizardConn ? (

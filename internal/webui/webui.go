@@ -54,6 +54,9 @@ type UI struct {
 	// version — ajan surumu (main.go main.version). /healthz'e yansir (yerel yuz teşhisi; OpenAPI
 	// info.version = TEK diger kaynak, manifest.AgentVersion — Pota tunelden onu okur).
 	version string
+	// tunnelStatus — tunel DURUMU (frpc sidecar catisma tespiti). nil ise /healthz'e "tunnel" eklenmez
+	// (geriye-donuk / tunelsiz test).
+	tunnelStatus func() (string, string)
 }
 
 // Plan — yerel yuz "Plan/Yukselt" ekrani icin config (deneme durumu + talep kanali).
@@ -79,12 +82,14 @@ type Deps struct {
 	PrimaryLabel   string
 	Plan           Plan
 	Version        string
+	TunnelStatus   func() (state, msg string)
 }
 
 func New(d Deps) *UI {
 	return &UI{man: d.Live, conn: d.Conn, aud: d.Aud, static: d.Static, apply: d.Apply,
 		adviser: d.Adviser, auth: newAuth(d.Password), dbConnect: d.DBConnect, reg: d.Registry,
-		erpnextConnect: d.ErpnextConnect, primaryLabel: d.PrimaryLabel, plan: d.Plan, version: d.Version}
+		erpnextConnect: d.ErpnextConnect, primaryLabel: d.PrimaryLabel, plan: d.Plan, version: d.Version,
+		tunnelStatus: d.TunnelStatus}
 }
 
 // connFor — istekteki ?conn=<label> bağlantısı (yoksa primary). Per-connection op scoping.
@@ -204,6 +209,13 @@ func (u *UI) healthz(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"ok": true, "db": u.dbOK(), "audit_head": u.auditHead(), "version": u.version}
 	if m != nil {
 		resp["connector"], resp["erp_kind"], resp["tools"] = m.Name, m.ERPKind, m.ToolNames()
+	}
+	if u.tunnelStatus != nil {
+		st, msg := u.tunnelStatus()
+		resp["tunnel"] = st
+		if msg != "" {
+			resp["tunnel_msg"] = msg
+		}
 	}
 	writeJSON(w, 200, resp)
 }

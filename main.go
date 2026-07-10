@@ -45,7 +45,7 @@ import (
 // Sürüm: SemVer ön-sürüm (0.x = stabil değil + 'beta' = müşteri erken-erişim). Her build ayırt edilebilir → takip.
 // var (const değil) — build-binaries.sh ileride `-ldflags -X main.version=$(git describe)` ile damgalar (tag varsa);
 // tag yoksa bu default kalır. Stabilleşince 0.1.0, üretim-hazır olunca 1.0.0.
-var version = "0.1.0-beta.1"
+var version = "0.1.0-beta.2"
 
 // Yerel web yuz (React+shadcn, web/) binary'ye GOMULU → tek-binary korunur, ayri sunucu yok.
 // `make build` (veya npm run build) web/dist'i uretir; go build gomer.
@@ -316,14 +316,15 @@ func runServe() {
 
 	ts := toolserver.New(cfg.AppToken, reg, aud)
 	upstream := &http.Server{Addr: cfg.UpstreamAddr, Handler: ts, ReadHeaderTimeout: 10 * time.Second}
+	tun := tunnel.NewSidecar(cfg.FrpcBin, cfg.FrpcConfig)
 	web := &http.Server{Addr: cfg.WebAddr, Handler: webui.New(webui.Deps{
 		Live: lm, Conn: conn, Aud: aud, Static: webUIFS(), Apply: apply,
 		Adviser: adviser, Password: cfg.WebPassword, DBConnect: dbConnect, Registry: reg,
 		ErpnextConnect: erpnextConnect, PrimaryLabel: cfg.ServerLabel, Version: version,
 		Plan: webui.Plan{Plan: cfg.Plan, TrialLimitUSD: cfg.TrialLimitUSD,
 			ContactEmail: cfg.ContactEmail, RequestURL: cfg.RequestURL},
+		TunnelStatus: tun.Status,
 	}).Handler(), ReadHeaderTimeout: 10 * time.Second}
-	tun := tunnel.NewSidecar(cfg.FrpcBin, cfg.FrpcConfig)
 
 	// Yerel yuz TLS (self-signed, §17.9): LAN'da token'i sifreler. Ac ise cert URET/YUKLE.
 	scheme := "http"

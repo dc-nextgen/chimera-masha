@@ -8,6 +8,8 @@ export type Health = {
   db: boolean
   tools: string[]
   audit_head: string
+  tunnel?: string // "off" | "connecting" | "connected" | "conflict" (frpc sidecar catisma tespiti)
+  tunnel_msg?: string
 }
 
 export type Filter = { name: string; field: string; op: string; required?: boolean }

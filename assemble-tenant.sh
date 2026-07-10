@@ -100,6 +100,11 @@ if [ ! -x ./frpc ]; then
   chmod +x ./frpc 2>/dev/null || true
 fi
 chmod +x ./masha-agent 2>/dev/null || true
+if [ "$(uname -s)" = "Darwin" ]; then
+  # macOS karantina bayrağını kaldır — ARA ÇÖZÜM (kod imzalama/notarization gelene kadar, bkz. build-binaries.sh
+  # MASHA_SIGN_IDENTITY); yoksa Gatekeeper "zararlı yazılım/Çöp Kutusu'na taşı" diyerek çalıştırmayı engeller.
+  xattr -dr com.apple.quarantine ./masha-agent 2>/dev/null || true
+fi
 set -a; . ./.masha.env; set +a
 nohup ./masha-agent serve > masha.log 2>&1 &
 sleep 2
@@ -109,6 +114,10 @@ INS
 chmod +x "$OUT/install.sh"
 cat > "$OUT/install.ps1" <<'PS'
 # Chimera Masha (deneme) — Windows. frpc.exe'yi github.com/fatedier/frp'den indirip bu klasöre koyun.
+# Windows MOTW (Zone.Identifier) kaldir — ARA COZUM (Authenticode imzasi gelene kadar): "internetten indirildi"
+# SmartScreen surtunmesini azaltir (macOS xattr karsiligi). Not: imzasiz-yayimci itibar uyarisi AYRIDIR, yalniz
+# kod-imzalama (tercihen EV) coz. Tolere: dosya/ADS yoksa sessizce gec.
+Get-ChildItem -Path .\masha-agent.exe, .\frpc.exe -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 Get-Content .\.masha.env | ForEach-Object { if($_ -match '^\s*([^#=][^=]*)=(.*)$'){ [Environment]::SetEnvironmentVariable($matches[1].Trim(),$matches[2]) } }
 Start-Process -NoNewWindow -FilePath .\masha-agent.exe -ArgumentList 'serve' -RedirectStandardOutput .\masha.log
 Start-Sleep 2
