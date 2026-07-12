@@ -44,8 +44,26 @@ var readTools = map[string]bool{
 
 const maxDocLimit = 200
 
-// AllowTool — yalniz salt-okuma araclari (fail-closed; yazma yok).
-func (c *Connector) AllowTool(tool string) bool { return readTools[tool] }
+// writeTools — insan-onayli YAZMA araclari (Faz1: yalniz create). submit/update/delete/cancel/
+// call_method BILEREK YOK = verb-tavani KOD'da (prompt/manifest guvenine dayanmaz; decision E).
+// Bu araclar OpenAPI'ye GIRMEZ (LLM gormez) — yalniz M2M/onay-akisi cagirir.
+var writeTools = map[string]bool{"create_document": true}
+
+// docstatusDraft — create yalniz TASLAK (docstatus=0) uretir; submit ASLA. Bu alanlar govdeden
+// atilir (istemci 1 gondererek submit'e yukseltemez) + name/owner gibi sistem alanlari da.
+var strippedWriteFields = map[string]bool{
+	"docstatus": true, "__islocal": true, "__unsaved": true, "name": true,
+	"owner": true, "modified_by": true, "creation": true, "modified": true, "idx": true,
+}
+
+// AllowTool — salt-okuma HER ZAMAN; create_document YALNIZ writeEnabled ise (SetWrite ile acilir).
+// Doctype beyaz-listesi burada DEGIL Call'da (fail-closed) — AllowTool tool-adi gorur, doctype gormez.
+func (c *Connector) AllowTool(tool string) bool {
+	if readTools[tool] {
+		return true
+	}
+	return c.writeEnabled && writeTools[tool]
+}
 
 // Call — tool'u ErpNext REST'e cevirir (yalniz GET; yazma yok). Sonuc JSON-serializable.
 func (c *Connector) Call(ctx context.Context, tool string, args map[string]any) (any, error) {
@@ -151,6 +169,43 @@ func (c *Connector) Call(ctx context.Context, tool string, args map[string]any) 
 			msg = maskAny(msg)
 		}
 		return msg, nil
+
+	case "create_document":
+		// YAZMA (Faz1 create-only). Cok-katli kapi: (1) writeEnabled, (2) doctype beyaz-liste
+		// (fail-closed), (3) verb-tavani = yalniz create (submit yok; docstatus stripped → taslak),
+		// (4) tehlikeli/sistem alan reddi. Insan-onayi AKIS katmaninda (AP Telegram); burasi KAPI.
+		if !c.writeEnabled {
+			return nil, fmt.Errorf("yazma kapali (MASHA_ERPNEXT_WRITE)")
+		}
+		dt := strArg(args, "doctype")
+		if dt == "" {
+			return nil, fmt.Errorf("doctype zorunlu")
+		}
+		if !c.writeAllow[dt] { // fail-closed beyaz-liste (decision G)
+			return nil, fmt.Errorf("doctype yazma izinli degil: %q", dt)
+		}
+		fields, ok := args["fields"].(map[string]any)
+		if !ok || len(fields) == 0 {
+			return nil, fmt.Errorf("fields (nesne) zorunlu")
+		}
+		body := map[string]any{"doctype": dt}
+		for k, v := range fields {
+			if strippedWriteFields[k] { // submit-yukseltme + sistem alanlari reddi
+				continue
+			}
+			body[k] = v
+		}
+		r, err := c.post(ctx, "/api/resource/"+url.PathEscape(dt), body)
+		if err != nil {
+			return nil, err
+		}
+		d, _ := r["data"].(map[string]any)
+		out := map[string]any{"created": true, "doctype": dt}
+		if d != nil {
+			out["name"] = d["name"]
+			out["docstatus"] = d["docstatus"] // 0 = taslak (dogrulama: submit olmadi)
+		}
+		return out, nil
 	}
 	return nil, fmt.Errorf("bilinmeyen tool: %q", tool)
 }

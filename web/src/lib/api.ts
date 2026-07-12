@@ -115,6 +115,8 @@ export type Settings = {
   cred_store: string // "keychain" | "dosya (0600)"
   llm_enabled: boolean
   erpnext_mask: boolean
+  erpnext_write: boolean
+  erpnext_write_doctypes?: string[]
   plan: string // "" (normal) | "trial"
   tunnel_state?: string // "off" | "connecting" | "connected" | "conflict"
   tunnel_msg?: string

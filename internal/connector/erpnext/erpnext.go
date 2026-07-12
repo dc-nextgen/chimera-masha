@@ -28,6 +28,13 @@ type Connector struct {
 	conf atomic.Pointer[cfg]
 	hc   *http.Client
 	mask bool
+	// Yazma yuzeyi ([[erp-write-human-approved]] Faz1). writeEnabled KAPALI => create_document
+	// AllowTool'da reddedilir (salt-okunur BIREBIR korunur). writeAllow = doctype BEYAZ-LISTE
+	// (fail-closed: bos => hicbir doctype yazilamaz). Bu iki alan Open'da SIFIRLI (salt-okunur);
+	// SetWrite ile acilir (main.go, config MASHA_ERPNEXT_WRITE=1 ise). OpenAPI'ye ETKI ETMEZ
+	// (create_document spec'e girmez → LLM gormez; yalniz M2M/onay-akisi cagirir).
+	writeEnabled bool
+	writeAllow   map[string]bool
 }
 
 // Fields — ekrandan girilen ErpNext bağlantısı (kimlik YERELDE, §3).
@@ -54,6 +61,56 @@ func Open(baseURL, apiKey, apiSecret string, mask bool) *Connector {
 
 func (c *Connector) Connected() bool { return c.conf.Load() != nil }
 func (c *Connector) Close() error    { return nil }
+
+// SetWrite — insan-onayli yazma yuzeyini ac (config MASHA_ERPNEXT_WRITE=1). doctypes = fail-closed
+// beyaz-liste (bos => enabled olsa bile hicbir doctype yazilamaz). Salt-okunur davranis default'tur;
+// bu cagrilmazsa (ya da enabled=false) create_document AllowTool'da reddedilir. Idempotent.
+func (c *Connector) SetWrite(enabled bool, doctypes []string) {
+	c.writeEnabled = enabled
+	m := make(map[string]bool, len(doctypes))
+	for _, d := range doctypes {
+		if d != "" {
+			m[d] = true
+		}
+	}
+	c.writeAllow = m
+}
+
+// postWith — verilen cfg ile kimlik-dogrulamali POST (JSON govde); yanit JSON'u dondurur. Yalniz
+// create_document kullanir (verb-tavani Call'da). GET getWith'in yazma-ikizi.
+func (c *Connector) post(ctx context.Context, path string, body any) (map[string]any, error) {
+	cf := c.conf.Load()
+	if cf == nil {
+		return nil, fmt.Errorf("ErpNext bagli degil")
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cf.baseURL+path, strings.NewReader(string(raw)))
+	if err != nil {
+		return nil, err
+	}
+	if cf.apiKey != "" {
+		req.Header.Set("Authorization", "token "+cf.apiKey+":"+cf.apiSec)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("ErpNext HTTP %d: %s", resp.StatusCode, truncate(string(rb), 200))
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rb, &out); err != nil {
+		return nil, fmt.Errorf("ErpNext yanit JSON degil: %s", truncate(string(rb), 120))
+	}
+	return out, nil
+}
 
 // Connect — dsn (JSON Fields) ile yeniden-yapılandır + doğrula (giriş yapan kullanıcı sorgusu). Swap atomik.
 func (c *Connector) Connect(ctx context.Context, dsn string) error {

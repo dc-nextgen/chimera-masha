@@ -73,7 +73,11 @@ type SettingsInfo struct {
 	CredStore   string `json:"cred_store"`   // "keychain" | "dosya (0600)"
 	LLMEnabled  bool   `json:"llm_enabled"`  // danisman yapilandirilmis mi?
 	ERPNextMask bool   `json:"erpnext_mask"`
-	Plan        string `json:"plan"` // "" normal | "trial"
+	// ErpNext YAZMA durumu (dürüst görünürlük; [[erp-write-human-approved]]). Salt-okunur DEFAULT;
+	// yazma acilirsa hangi doctype'lara IZIN verildigi ekranda gorunur (operator sessizce acamaz).
+	ERPNextWrite         bool     `json:"erpnext_write"`
+	ERPNextWriteDoctypes []string `json:"erpnext_write_doctypes"`
+	Plan                 string   `json:"plan"` // "" normal | "trial"
 }
 
 // Plan — yerel yuz "Plan/Yukselt" ekrani icin config (deneme durumu + talep kanali).

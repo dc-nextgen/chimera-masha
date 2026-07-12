@@ -139,6 +139,35 @@ export function Ayarlar() {
 
       <Card>
         <CardHeader className="pb-2">
+          <CardTitle className="text-base">ErpNext yazma</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Yazma yüzeyi</span>
+            <Badge variant={s.erpnext_write ? 'default' : 'outline'}>{s.erpnext_write ? 'Açık' : 'Salt-okunur'}</Badge>
+          </div>
+          {s.erpnext_write && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-muted-foreground">İzinli doctype</span>
+              {(s.erpnext_write_doctypes ?? []).length > 0 ? (
+                (s.erpnext_write_doctypes ?? []).map((d) => (
+                  <Badge key={d} variant="secondary">{d}</Badge>
+                ))
+              ) : (
+                <Badge variant="outline">yok (hiçbir şey yazılamaz)</Badge>
+              )}
+            </div>
+          )}
+          <p className="text-muted-foreground text-xs">
+            Yazma yalnız insan-onaylı akıştan (Telegram/onay) çağrılır; sohbet asistanı doğrudan yazamaz.
+            Yalnız kayıt <em>oluşturma</em> (taslak); güncelleme/onaylama/silme yok.
+          </p>
+          <EnvNote />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">LLM danışman</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">

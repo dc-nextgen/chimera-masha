@@ -49,7 +49,7 @@ import (
 // Sürüm: SemVer ön-sürüm (0.x = stabil değil + 'beta' = müşteri erken-erişim). Her build ayırt edilebilir → takip.
 // var (const değil) — build-binaries.sh ileride `-ldflags -X main.version=$(git describe)` ile damgalar (tag varsa);
 // tag yoksa bu default kalır. Stabilleşince 0.1.0, üretim-hazır olunca 1.0.0.
-var version = "0.1.0-beta.3"
+var version = "0.1.0-beta.4"
 
 // Yerel web yuz (React+shadcn, web/) binary'ye GOMULU → tek-binary korunur, ayri sunucu yok.
 // `make build` (veya npm run build) web/dist'i uretir; go build gomer.
@@ -290,16 +290,21 @@ func runServe() {
 	var erpConn *erpnext.Connector
 	if erpFields.URL != "" {
 		erpConn = erpnext.Open(erpFields.URL, erpFields.APIKey, erpFields.APISecret, cfg.ERPNextMask)
+		erpConn.SetWrite(cfg.ERPNextWrite, cfg.ERPNextWriteDoctypes)
 		reg.Add(&registry.Connection{
 			Name: cfg.ERPNextLabel, Label: "ErpNext (salt-okunur)", Kind: "erpnext",
 			ServerLabel: cfg.ERPNextLabel, Conn: erpConn,
 		})
 		log.Printf("2. baglanti kayitli: ErpNext (%s) → server=%q (maske=%v)", erpFields.URL, cfg.ERPNextLabel, cfg.ERPNextMask)
+		if cfg.ERPNextWrite {
+			log.Printf("ErpNext YAZMA ACIK (insan-onayli, create-only) → izinli doctype: %v", cfg.ERPNextWriteDoctypes)
+		}
 	}
 	// erpnextConnect — ekrandan ErpNext bağlan: yoksa oluştur+kaydet, Connect (doğrula), YERELE yaz (§3).
 	erpnextConnect := func(f erpnext.Fields) error {
 		if erpConn == nil {
 			erpConn = erpnext.Open("", "", "", cfg.ERPNextMask)
+			erpConn.SetWrite(cfg.ERPNextWrite, cfg.ERPNextWriteDoctypes)
 			reg.Add(&registry.Connection{
 				Name: cfg.ERPNextLabel, Label: "ErpNext (salt-okunur)", Kind: "erpnext",
 				ServerLabel: cfg.ERPNextLabel, Conn: erpConn,
@@ -330,6 +335,7 @@ func runServe() {
 			AuthEnabled: cfg.WebPassword != "", TunnelMode: cfg.TunnelMode,
 			CredStore: cm.Label, LLMEnabled: adviser != nil,
 			ERPNextMask: cfg.ERPNextMask, Plan: cfg.Plan,
+			ERPNextWrite: cfg.ERPNextWrite, ERPNextWriteDoctypes: cfg.ERPNextWriteDoctypes,
 		},
 	}).Handler(), ReadHeaderTimeout: 10 * time.Second}
 

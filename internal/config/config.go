@@ -48,6 +48,16 @@ type Config struct {
 	ERPNextLabel    string // server_label + OWUI tool_id. default "erpnext"
 	ERPNextCredFile string // ekrandan girilen ErpNext kimliginin YEREL konumu. default .masha-erpnext.json
 	ERPNextMask     bool   // MASHA_ERPNEXT_MASK — dokuman PII maskele (default ACIK; on-prem ERP privacy). 0=kapat
+	// ── ErpNext YAZMA (insan-onayli; [[erp-write-human-approved]] Faz1 create-only) ──
+	// Salt-okunur = DEFAULT/taban, dogma degil. Yazma AYRI bir yuzey: OWUI/LLM OpenAPI'sinde
+	// GORUNMEZ (create_document spec'e KOYULMAZ) → sohbet modeli cagiramaz. Yalniz M2M cagiran
+	// (Activepieces akisi, Telegram-onayi SONRASI; from.id forge-edilemez insan-jesti) bearer ile
+	// dogrudan POST /<label>/create_document ceker. Insan-onayi AKISTA (Masha degil) — Masha KAPI:
+	// verb-tavani (yalniz create; submit/update/delete/cancel ASLA = kod, decision E), doctype
+	// BEYAZ-LISTE (decision G, fail-closed: liste bos => hicbir sey yazilamaz), docstatus/tehlikeli
+	// alan reddi. DEFAULT KAPALI (non-breaking). Her yazma hash-zincir audit'e girer (toolserver).
+	ERPNextWrite         bool     // MASHA_ERPNEXT_WRITE — yazma yuzeyini ac (default KAPALI)
+	ERPNextWriteDoctypes []string // MASHA_ERPNEXT_WRITE_DOCTYPES — virgullu beyaz-liste (fail-closed)
 	// Plan / deneme (satis yuzeyi) — yerel yuz "Plan/Yukselt" ekrani. Bos plan = normal (ucretli/kurulu).
 	// "trial" = deneme rozeti + limit gosterimi. Talep = musteri yukselt/iletisim (operatore ulasir).
 	Plan          string // MASHA_PLAN — "" (normal) | "trial" (deneme)
@@ -72,43 +82,56 @@ type Config struct {
 
 func Load() (*Config, error) {
 	c := &Config{
-		AppToken:        env("MASHA_APP_TOKEN", ""),
-		ServerLabel:     env("MASHA_SERVER_LABEL", "masha-db"),
-		ManifestPath:    env("MASHA_MANIFEST", ""),
-		DSN:             env("MASHA_DB_DSN", ""),
-		DBCredFile:      env("MASHA_DB_CRED_FILE", ".masha-db.json"),
-		Keyring:         envBool("MASHA_KEYRING", true),
-		UpstreamAddr:    env("MASHA_UPSTREAM_ADDR", "127.0.0.1:9800"),
-		WebAddr:         env("MASHA_WEB_ADDR", "127.0.0.1:8787"),
-		WebPassword:     env("MASHA_WEB_PASSWORD", ""),
-		WebTLS:          truthy(env("MASHA_WEB_TLS", "")),
-		WebTLSDir:       env("MASHA_WEB_TLS_DIR", ".masha-webtls"),
-		AuditFile:       env("MASHA_AUDIT_LOG", ""),
-		Tenant:          env("MASHA_TENANT", ""),
-		FrpcBin:         env("MASHA_FRPC_BIN", "frpc"),
-		FrpcConfig:      env("MASHA_FRPC_CONFIG", ""),
-		TunnelMode:      env("MASHA_TUNNEL_MODE", "sidecar"),
-		LLMBaseURL:      env("MASHA_LLM_BASE_URL", ""),
-		LLMAPIKey:       env("MASHA_LLM_API_KEY", ""),
-		LLMModel:        env("MASHA_LLM_MODEL", ""),
-		ERPNextURL:      envOr("MASHA_ERPNEXT_URL", "ERPNEXT_URL"),
-		ERPNextKey:      envOr("MASHA_ERPNEXT_API_KEY", "ERPNEXT_API_KEY"),
-		ERPNextSecret:   envOr("MASHA_ERPNEXT_API_SECRET", "ERPNEXT_API_SECRET"),
-		ERPNextLabel:    env("MASHA_ERPNEXT_LABEL", "erpnext"),
-		ERPNextCredFile: env("MASHA_ERPNEXT_CRED_FILE", ".masha-erpnext.json"),
-		ERPNextMask:     envBool("MASHA_ERPNEXT_MASK", true),
-		Plan:            env("MASHA_PLAN", ""),
-		TrialLimitUSD:   env("MASHA_TRIAL_LIMIT_USD", "10"),
-		ContactEmail:    env("MASHA_CONTACT_EMAIL", ""),
-		RequestURL:      env("MASHA_REQUEST_URL", ""),
-		DocsDir:         env("MASHA_DOCS_DIR", ""),
-		DocsOWUIURL:     env("MASHA_DOCS_OWUI_URL", ""),
-		DocsOWUIKey:     env("MASHA_DOCS_OWUI_KEY", ""),
-		DocsKnowledgeID: env("MASHA_DOCS_KNOWLEDGE_ID", ""),
-		DocsMask:        envBool("MASHA_DOCS_MASK", false),
-		DocsStateFile:   env("MASHA_DOCS_STATE_FILE", ".masha-docs-state.json"),
+		AppToken:             env("MASHA_APP_TOKEN", ""),
+		ServerLabel:          env("MASHA_SERVER_LABEL", "masha-db"),
+		ManifestPath:         env("MASHA_MANIFEST", ""),
+		DSN:                  env("MASHA_DB_DSN", ""),
+		DBCredFile:           env("MASHA_DB_CRED_FILE", ".masha-db.json"),
+		Keyring:              envBool("MASHA_KEYRING", true),
+		UpstreamAddr:         env("MASHA_UPSTREAM_ADDR", "127.0.0.1:9800"),
+		WebAddr:              env("MASHA_WEB_ADDR", "127.0.0.1:8787"),
+		WebPassword:          env("MASHA_WEB_PASSWORD", ""),
+		WebTLS:               truthy(env("MASHA_WEB_TLS", "")),
+		WebTLSDir:            env("MASHA_WEB_TLS_DIR", ".masha-webtls"),
+		AuditFile:            env("MASHA_AUDIT_LOG", ""),
+		Tenant:               env("MASHA_TENANT", ""),
+		FrpcBin:              env("MASHA_FRPC_BIN", "frpc"),
+		FrpcConfig:           env("MASHA_FRPC_CONFIG", ""),
+		TunnelMode:           env("MASHA_TUNNEL_MODE", "sidecar"),
+		LLMBaseURL:           env("MASHA_LLM_BASE_URL", ""),
+		LLMAPIKey:            env("MASHA_LLM_API_KEY", ""),
+		LLMModel:             env("MASHA_LLM_MODEL", ""),
+		ERPNextURL:           envOr("MASHA_ERPNEXT_URL", "ERPNEXT_URL"),
+		ERPNextKey:           envOr("MASHA_ERPNEXT_API_KEY", "ERPNEXT_API_KEY"),
+		ERPNextSecret:        envOr("MASHA_ERPNEXT_API_SECRET", "ERPNEXT_API_SECRET"),
+		ERPNextLabel:         env("MASHA_ERPNEXT_LABEL", "erpnext"),
+		ERPNextCredFile:      env("MASHA_ERPNEXT_CRED_FILE", ".masha-erpnext.json"),
+		ERPNextMask:          envBool("MASHA_ERPNEXT_MASK", true),
+		ERPNextWrite:         envBool("MASHA_ERPNEXT_WRITE", false),
+		ERPNextWriteDoctypes: csv(env("MASHA_ERPNEXT_WRITE_DOCTYPES", "")),
+		Plan:                 env("MASHA_PLAN", ""),
+		TrialLimitUSD:        env("MASHA_TRIAL_LIMIT_USD", "10"),
+		ContactEmail:         env("MASHA_CONTACT_EMAIL", ""),
+		RequestURL:           env("MASHA_REQUEST_URL", ""),
+		DocsDir:              env("MASHA_DOCS_DIR", ""),
+		DocsOWUIURL:          env("MASHA_DOCS_OWUI_URL", ""),
+		DocsOWUIKey:          env("MASHA_DOCS_OWUI_KEY", ""),
+		DocsKnowledgeID:      env("MASHA_DOCS_KNOWLEDGE_ID", ""),
+		DocsMask:             envBool("MASHA_DOCS_MASK", false),
+		DocsStateFile:        env("MASHA_DOCS_STATE_FILE", ".masha-docs-state.json"),
 	}
 	return c, nil
+}
+
+// csv — "a, b ,c" → ["a","b","c"] (bosluk-kirpar, bos ogeleri atar). Bos girdi => nil (fail-closed).
+func csv(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // envBool — set edilmemiş/boş ise def; aksi halde truthy(v).
