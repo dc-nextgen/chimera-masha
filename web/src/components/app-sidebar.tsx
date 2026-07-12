@@ -1,4 +1,4 @@
-import { DatabaseIcon, GaugeIcon, PlugIcon, RocketIcon } from 'lucide-react'
+import { DatabaseIcon, GaugeIcon, PlugIcon, RocketIcon, SlidersHorizontalIcon } from 'lucide-react'
 
 import {
   Sidebar,
@@ -15,12 +15,13 @@ import {
 import type { Health } from '@/lib/api'
 
 // Master-detail (§19.2): sidebar sade+stabil. Kur/Araçlar/Şema = bağlantı DETAYINDA sekme.
-export type View = 'durum' | 'baglantilar' | 'plan'
+export type View = 'durum' | 'baglantilar' | 'plan' | 'ayarlar'
 
 const items: { key: View; title: string; icon: typeof GaugeIcon }[] = [
   { key: 'durum', title: 'Durum', icon: GaugeIcon },
   { key: 'baglantilar', title: 'Bağlantılar', icon: PlugIcon },
   { key: 'plan', title: 'Plan', icon: RocketIcon },
+  { key: 'ayarlar', title: 'Ayarlar', icon: SlidersHorizontalIcon },
 ]
 
 export function AppSidebar({

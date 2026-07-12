@@ -106,7 +106,19 @@ if [ "$(uname -s)" = "Darwin" ]; then
   xattr -dr com.apple.quarantine ./masha-agent 2>/dev/null || true
 fi
 set -a; . ./.masha.env; set +a
-nohup ./masha-agent serve > masha.log 2>&1 &
+# Kalıcı (reboot-proof) kurulum: kardianos native servis (launchd/systemd). Env .masha.env'den
+# YAKALANIR (service install anında). Yetki yoksa / desteklenmezse oturumluk nohup'a düşer.
+if ./masha-agent service install 2>/dev/null; then
+  ./masha-agent service start 2>/dev/null || true
+  echo "✓ Masha SERVİS olarak kuruldu (reboot'ta otomatik başlar, çöküşte yeniden)."
+elif ./masha-agent service status 2>/dev/null | grep -qiv "kurulu değil"; then
+  ./masha-agent service restart 2>/dev/null || ./masha-agent service start 2>/dev/null || true
+  echo "✓ Masha servisi zaten kurulu — yeniden başlatıldı."
+else
+  echo "⚠ Servis kurulamadı — oturumluk başlatılıyor (reboot'ta DURUR)."
+  echo "  Kalıcı için: sudo ./masha-agent service install && sudo ./masha-agent service start"
+  nohup ./masha-agent serve > masha.log 2>&1 &
+fi
 sleep 2
 echo "✓ Masha çalışıyor. Yerel yüz:  https://<bu-bilgisayarın-IP>:8787"
 echo "  Parola .masha.env içinde. Tarayıcıda aç → Bağlantılar → veritabanını bağla → Kur sihirbazı."
@@ -119,7 +131,16 @@ cat > "$OUT/install.ps1" <<'PS'
 # kod-imzalama (tercihen EV) coz. Tolere: dosya/ADS yoksa sessizce gec.
 Get-ChildItem -Path .\masha-agent.exe, .\frpc.exe -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 Get-Content .\.masha.env | ForEach-Object { if($_ -match '^\s*([^#=][^=]*)=(.*)$'){ [Environment]::SetEnvironmentVariable($matches[1].Trim(),$matches[2]) } }
-Start-Process -NoNewWindow -FilePath .\masha-agent.exe -ArgumentList 'serve' -RedirectStandardOutput .\masha.log
+# Kalici (boot-proof) kurulum: Windows Service (kardianos). Env process-scope set edildi → service
+# install ANINDA yakalanir. Yonetici gerekebilir; basarisizsa oturumluk Start-Process'e duser.
+.\masha-agent.exe service install 2>$null
+if ($LASTEXITCODE -eq 0) {
+  .\masha-agent.exe service start 2>$null
+  Write-Host "Masha SERVIS olarak kuruldu (boot'ta otomatik baslar)."
+} else {
+  Write-Host "Servis kurulamadi (Yonetici olarak calistirmayi deneyin) - oturumluk baslatiliyor."
+  Start-Process -NoNewWindow -FilePath .\masha-agent.exe -ArgumentList 'serve' -RedirectStandardOutput .\masha.log
+}
 Start-Sleep 2
 Write-Host "Masha calisiyor. Yerel yuz: https://<IP>:8787 (parola .masha.env icinde)"
 PS

@@ -7,9 +7,11 @@
 //
 //	serve       (default) tool-server + yerel web yuz + (ops) frpc tunel
 //	introspect  sema YAPISINI (tablo/kolon) JSON bas — onboarding/test (satir okumaz)
+//	service     install|uninstall|start|stop|restart|status — reboot-proof OS servisi (kardianos;
+//	            launchd/systemd/Windows Service; MASHA_SERVICE_USER=1 → per-user servis)
+//	tray        sistem tepsisi ikonu + menu (Aç·Restart·Ayarlar·Çıkış); `serve`'i COCUK SUREC olarak
+//	            gozetir (login-item/GUI-oturum yuzu; headless kurulumda 'service' kullanilir)
 //	version
-//
-// kardianos service (install/start/stop) = Faz 3.
 package main
 
 import (
@@ -30,8 +32,10 @@ import (
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/audit"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/config"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/documents"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/erpnext"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/connector/mssql"
+	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/creds"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/live"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/manifest"
 	"github.com/mehmetor/chimera-ai/stack/masha/agent/internal/onboard"
@@ -45,7 +49,7 @@ import (
 // Sürüm: SemVer ön-sürüm (0.x = stabil değil + 'beta' = müşteri erken-erişim). Her build ayırt edilebilir → takip.
 // var (const değil) — build-binaries.sh ileride `-ldflags -X main.version=$(git describe)` ile damgalar (tag varsa);
 // tag yoksa bu default kalır. Stabilleşince 0.1.0, üretim-hazır olunca 1.0.0.
-var version = "0.1.0-beta.2"
+var version = "0.1.0-beta.3"
 
 // Yerel web yuz (React+shadcn, web/) binary'ye GOMULU → tek-binary korunur, ayri sunucu yok.
 // `make build` (veya npm run build) web/dist'i uretir; go build gomer.
@@ -77,8 +81,16 @@ func main() {
 		runIntrospect()
 	case "serve":
 		runServe()
+	case "service":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "kullanim: masha-agent service install|uninstall|start|stop|restart|status")
+			os.Exit(2)
+		}
+		runServiceCmd(os.Args[2])
+	case "tray":
+		runTray()
 	default:
-		fmt.Fprintf(os.Stderr, "bilinmeyen komut: %s (serve|introspect|version)\n", cmd)
+		fmt.Fprintf(os.Stderr, "bilinmeyen komut: %s (serve|introspect|service|tray|version)\n", cmd)
 		os.Exit(2)
 	}
 }
@@ -86,7 +98,7 @@ func main() {
 // openConnector — manifest + DSN'den mssql connector. DSN kaynak sirasi: env MASHA_DB_DSN >
 // yerel cred dosyasi (ekrandan-baglan) > BOS (ekrandan baglanmayi bekle, fatal DEGIL).
 // Manifest CANLI holder'a konur (onboarding apply hot-swap eder).
-func openConnector(cfg *config.Config) (*mssql.Connector, *live.Manifest) {
+func openConnector(cfg *config.Config, cm *creds.CredManager) (*mssql.Connector, *live.Manifest) {
 	// Taze kurulum/deneme: manifest dosyasi YOKSA bos-baslangicla ac (web+wizard calisir; ilk apply doldurur).
 	man, err := manifest.LoadOrEmpty(cfg.ManifestPath, cfg.ServerLabel)
 	if err != nil {
@@ -98,9 +110,9 @@ func openConnector(cfg *config.Config) (*mssql.Connector, *live.Manifest) {
 	lm := live.New(man)
 	dsn := cfg.DSN
 	if dsn == "" {
-		if f, err := loadCreds(cfg.DBCredFile); err == nil && f != nil {
+		if f, err := loadCreds(cm, cfg.DBCredFile); err == nil && f != nil {
 			dsn = mssql.BuildDSN(*f)
-			log.Printf("DB kimligi yerel dosyadan yuklendi (%s@%s)", f.User, f.Host)
+			log.Printf("DB kimligi %s'den yuklendi (%s@%s)", cm.Label, f.User, f.Host)
 		}
 	}
 	conn, err := mssql.Open(dsn, lm)
@@ -113,68 +125,36 @@ func openConnector(cfg *config.Config) (*mssql.Connector, *live.Manifest) {
 	return conn, lm
 }
 
-// loadCreds — ekrandan girilen DB kimligini yerel dosyadan oku (0600). Yoksa (nil,nil).
-func loadCreds(path string) (*connector.DBFields, error) {
-	if path == "" {
-		return nil, nil
-	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err // yok/okunamaz → dosya yok say (ekrandan baglanilir)
-	}
+// loadCreds — ekrandan girilen DB kimligini kimlik deposundan (keychain veya 0600 dosya, cm.Label'a
+// gore) oku. Yoksa (nil,nil). Keychain kullanilirken legacyPath'te eski-kurulum kalintisi varsa
+// otomatik migrasyon uygulanir (cm.Load).
+func loadCreds(cm *creds.CredManager, legacyPath string) (*connector.DBFields, error) {
 	var f connector.DBFields
-	if err := json.Unmarshal(b, &f); err != nil {
+	ok, err := cm.LoadJSON("db", legacyPath, &f)
+	if err != nil || !ok {
 		return nil, err
 	}
 	return &f, nil
 }
 
-// saveCreds — DB kimligini YERELE kalici yaz (0600; §3 buluta ASLA gitmez). Faz 3: keychain.
-func saveCreds(path string, f connector.DBFields) error {
-	if path == "" {
-		return fmt.Errorf("MASHA_DB_CRED_FILE bos — kimlik kalici yazilamaz")
-	}
-	b, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+// saveCreds — DB kimligini kimlik deposuna kalici yaz (§3 buluta ASLA gitmez; Faz 3 keychain).
+func saveCreds(cm *creds.CredManager, legacyPath string, f connector.DBFields) error {
+	return cm.SaveJSON("db", legacyPath, f)
 }
 
-// loadErpFields — ekrandan girilen ErpNext kimligini yerel dosyadan oku (0600). Yoksa (nil,nil).
-func loadErpFields(path string) (*erpnext.Fields, error) {
-	if path == "" {
-		return nil, nil
-	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+// loadErpFields — ekrandan girilen ErpNext kimligini kimlik deposundan oku. Yoksa (nil,nil).
+func loadErpFields(cm *creds.CredManager, legacyPath string) (*erpnext.Fields, error) {
 	var f erpnext.Fields
-	if err := json.Unmarshal(b, &f); err != nil {
+	ok, err := cm.LoadJSON("erpnext", legacyPath, &f)
+	if err != nil || !ok {
 		return nil, err
 	}
 	return &f, nil
 }
 
-// saveErpFields — ErpNext kimligini YERELE kalici yaz (0600; §3 buluta gitmez). Faz 3: keychain.
-func saveErpFields(path string, f erpnext.Fields) error {
-	if path == "" {
-		return fmt.Errorf("MASHA_ERPNEXT_CRED_FILE bos")
-	}
-	b, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+// saveErpFields — ErpNext kimligini kimlik deposuna kalici yaz (§3 buluta gitmez; Faz 3 keychain).
+func saveErpFields(cm *creds.CredManager, legacyPath string, f erpnext.Fields) error {
+	return cm.SaveJSON("erpnext", legacyPath, f)
 }
 
 // writeManifestAtomic — manifest'i KALICI yaz (temp + rename; yarim dosya birakmaz). Onboarding apply.
@@ -215,13 +195,34 @@ func runIntrospect() {
 	enc.Encode(sc)
 }
 
+// tunnelIface — sidecar (SidecarFrpc) VE embed (EmbeddedFrpc) tunel'in ORTAK yuzu; runServe
+// hangi implementasyonu kullandigini bilmez (MASHA_TUNNEL_MODE secer).
+type tunnelIface interface {
+	Start(ctx context.Context) error
+	Stop() error
+	Status() (state, msg string)
+}
+
+// newTunnel — cfg.TunnelMode'a gore sidecar (harici frpc ikilisi/Docker) veya embed (surec-ici
+// frp client, Docker/harici frpc YOK) secer. Varsayilan "sidecar" — mevcut davranis DEGISMEZ.
+func newTunnel(cfg *config.Config) tunnelIface {
+	if cfg.TunnelMode == "embed" {
+		return tunnel.NewEmbedded(cfg.FrpcConfig)
+	}
+	return tunnel.NewSidecar(cfg.FrpcBin, cfg.FrpcConfig)
+}
+
 func runServe() {
 	manifest.SetVersion(version) // OpenAPI info.version + /healthz TEK kaynak (build-binaries.sh ldflags damgalarsa o)
 	cfg, _ := config.Load()
 	if err := cfg.RequireServe(); err != nil {
 		log.Fatalf("FATAL: %v", err) // kimlik-doğrulamasiz/manifest'siz acilmaz
 	}
-	conn, lm := openConnector(cfg)
+	credStore, credLabel := creds.Resolve(cfg.Keyring, "masha-agent", "")
+	cm := creds.NewCredManager(credStore, credLabel)
+	log.Printf("kimlik saklama: %s", cm.Label)
+
+	conn, lm := openConnector(cfg, cm)
 	defer conn.Close()
 	man := lm.Get()
 
@@ -260,7 +261,7 @@ func runServe() {
 		if err := conn.Connect(context.Background(), mssql.BuildDSN(f)); err != nil {
 			return err
 		}
-		if err := saveCreds(cfg.DBCredFile, f); err != nil {
+		if err := saveCreds(cm, cfg.DBCredFile, f); err != nil {
 			log.Printf("UYARI: DB baglandi ama yerel kayit basarisiz (%v) — restart'ta unutulur", err)
 		}
 		log.Printf("DB baglandi (ekrandan): %s@%s/%s", f.User, f.Host, f.Database)
@@ -281,9 +282,9 @@ func runServe() {
 	// ErpNext kimligi: env > yerel dosya (ekrandan-baglan). Varsa 2. baglanti olarak kaydet.
 	erpFields := erpnext.Fields{URL: cfg.ERPNextURL, APIKey: cfg.ERPNextKey, APISecret: cfg.ERPNextSecret}
 	if erpFields.URL == "" {
-		if f, err := loadErpFields(cfg.ERPNextCredFile); err == nil && f != nil {
+		if f, err := loadErpFields(cm, cfg.ERPNextCredFile); err == nil && f != nil {
 			erpFields = *f
-			log.Printf("ErpNext kimligi yerel dosyadan yuklendi (%s)", f.URL)
+			log.Printf("ErpNext kimligi %s'den yuklendi (%s)", cm.Label, f.URL)
 		}
 	}
 	var erpConn *erpnext.Connector
@@ -307,7 +308,7 @@ func runServe() {
 		if err := erpConn.Connect(context.Background(), erpnext.BuildDSN(f)); err != nil {
 			return err
 		}
-		if err := saveErpFields(cfg.ERPNextCredFile, f); err != nil {
+		if err := saveErpFields(cm, cfg.ERPNextCredFile, f); err != nil {
 			log.Printf("UYARI: ErpNext baglandi ama yerel kayit basarisiz (%v)", err)
 		}
 		log.Printf("ErpNext baglandi (ekrandan): %s", f.URL)
@@ -316,7 +317,7 @@ func runServe() {
 
 	ts := toolserver.New(cfg.AppToken, reg, aud)
 	upstream := &http.Server{Addr: cfg.UpstreamAddr, Handler: ts, ReadHeaderTimeout: 10 * time.Second}
-	tun := tunnel.NewSidecar(cfg.FrpcBin, cfg.FrpcConfig)
+	tun := newTunnel(cfg)
 	web := &http.Server{Addr: cfg.WebAddr, Handler: webui.New(webui.Deps{
 		Live: lm, Conn: conn, Aud: aud, Static: webUIFS(), Apply: apply,
 		Adviser: adviser, Password: cfg.WebPassword, DBConnect: dbConnect, Registry: reg,
@@ -324,6 +325,12 @@ func runServe() {
 		Plan: webui.Plan{Plan: cfg.Plan, TrialLimitUSD: cfg.TrialLimitUSD,
 			ContactEmail: cfg.ContactEmail, RequestURL: cfg.RequestURL},
 		TunnelStatus: tun.Status,
+		Settings: webui.SettingsInfo{
+			Version: version, WebAddr: cfg.WebAddr, WebTLS: cfg.WebTLS,
+			AuthEnabled: cfg.WebPassword != "", TunnelMode: cfg.TunnelMode,
+			CredStore: cm.Label, LLMEnabled: adviser != nil,
+			ERPNextMask: cfg.ERPNextMask, Plan: cfg.Plan,
+		},
 	}).Handler(), ReadHeaderTimeout: 10 * time.Second}
 
 	// Yerel yuz TLS (self-signed, §17.9): LAN'da token'i sifreler. Ac ise cert URET/YUKLE.
@@ -354,9 +361,36 @@ func runServe() {
 	if err := tun.Start(ctx); err != nil {
 		log.Printf("UYARI: tunel baslamadi (%v) — yalniz-yerel modda devam", err)
 	} else if cfg.FrpcConfig != "" {
-		log.Printf("tunel (frpc sidecar) baslatildi")
+		if cfg.TunnelMode == "embed" {
+			log.Printf("tunel modu: embed (surec-ici frp) baslatildi")
+		} else {
+			log.Printf("tunel (frpc sidecar) baslatildi")
+		}
 	} else {
 		log.Printf("tunel KAPALI (MASHA_FRPC_CONFIG bos) — yalniz-yerel mod")
+	}
+
+	// Dokuman/RAG sync (3. bilgi kaynagi): DocsDir set ise dizini izle → metni cikar → (maskele) →
+	// OWUI knowledge'a push. Arka-plan; ctx ile durur. Kimlik/durum YEREL (§3). Eksik config = uyar, gecme.
+	if cfg.DocsDir != "" {
+		if cfg.DocsOWUIURL == "" || cfg.DocsOWUIKey == "" || cfg.DocsKnowledgeID == "" {
+			log.Printf("UYARI: MASHA_DOCS_DIR set ama OWUI_URL/KEY/KNOWLEDGE_ID eksik — dokuman sync ATLANDI")
+		} else {
+			st, err := documents.LoadState(cfg.DocsStateFile)
+			if err != nil {
+				log.Printf("UYARI: dokuman sync durumu okunamadi (%v) — bos durumla devam", err)
+				st = documents.NewState(cfg.DocsStateFile)
+			}
+			syncer := &documents.Syncer{
+				Dir: cfg.DocsDir, KnowledgeID: cfg.DocsKnowledgeID, Mask: cfg.DocsMask,
+				Client: &documents.OWUIClient{BaseURL: cfg.DocsOWUIURL, APIKey: cfg.DocsOWUIKey, HTTP: http.DefaultClient},
+				State:  st,
+				Logf:   func(f string, a ...any) { log.Printf("[dokuman] "+f, a...) },
+			}
+			watcher := &documents.Watcher{Syncer: syncer, Logf: func(f string, a ...any) { log.Printf("[dokuman] "+f, a...) }}
+			go watcher.Run(ctx)
+			log.Printf("dokuman sync AKIF: %s → OWUI knowledge %s (maske=%v)", cfg.DocsDir, cfg.DocsKnowledgeID, cfg.DocsMask)
+		}
 	}
 
 	log.Printf("masha-agent %s hazir · server=%q · araclar=%v", version, cfg.ServerLabel, man.ToolNames())

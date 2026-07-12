@@ -10,14 +10,22 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api, getAuthToken, type ConnInfo, type Health } from '@/lib/api'
+import { Ayarlar } from '@/pages/Ayarlar'
 import { Baglantilar } from '@/pages/Baglantilar'
 import { ConnectionDetail } from '@/pages/ConnectionDetail'
 import { Durum } from '@/pages/Durum'
 import { Plan } from '@/pages/Plan'
 import { Wizard } from '@/pages/Wizard'
 
+// initialView — tray menüsü "Ayarlar" /ayarlar path'ini açar (SPA state-tabanlı, react-router yok).
+// İlk yüklemede path'e bak; başka her şeyde varsayılan davranış aynı kalır (durum).
+function initialView(): View {
+  if (/^\/ayarlar\/?$/.test(window.location.pathname)) return 'ayarlar'
+  return 'durum'
+}
+
 export default function App() {
-  const [view, setView] = useState<View>('durum')
+  const [view, setView] = useState<View>(initialView)
   const [health, setHealth] = useState<Health | null>(null)
   const [authRequired, setAuthRequired] = useState<boolean | null>(null)
   const [authed, setAuthed] = useState(false)
@@ -105,7 +113,7 @@ export default function App() {
               </>
             ) : (
               <h1 className="text-sm font-medium">
-                {view === 'durum' ? 'Durum' : view === 'plan' ? 'Plan' : 'Bağlantılar'}
+                {view === 'durum' ? 'Durum' : view === 'plan' ? 'Plan' : view === 'ayarlar' ? 'Ayarlar' : 'Bağlantılar'}
               </h1>
             )}
             <div className="ml-auto">
@@ -132,6 +140,7 @@ export default function App() {
                 <>
                   {view === 'durum' && <Durum health={health} conns={conns} onSelect={(c) => { setView('baglantilar'); setDetailLabel(c.server_label) }} />}
                   {view === 'plan' && <Plan />}
+                  {view === 'ayarlar' && <Ayarlar />}
                   {view === 'baglantilar' &&
                     (detailConn ? (
                       <ConnectionDetail

@@ -57,6 +57,23 @@ type UI struct {
 	// tunnelStatus — tunel DURUMU (frpc sidecar catisma tespiti). nil ise /healthz'e "tunnel" eklenmez
 	// (geriye-donuk / tunelsiz test).
 	tunnelStatus func() (string, string)
+	// settings — Ayarlar ekrani icin sabit calisma-zamani config (main doldurur).
+	settings SettingsInfo
+}
+
+// SettingsInfo — Ayarlar ekrani icin GERCEK calisma-zamani config (§4 durustluk: uydurma yok).
+// Cogu alan yalniz env/kurulumla degisir → ekran salt-okunur gosterir (sahte duzenlenebilir
+// anahtar YOK — sessizce kalicilasmayan bir toggle sundurmak durustluk ilkesini bozar).
+type SettingsInfo struct {
+	Version     string `json:"version"`
+	WebAddr     string `json:"web_addr"`
+	WebTLS      bool   `json:"web_tls"`
+	AuthEnabled bool   `json:"auth_enabled"` // web parolasi kurulu mu?
+	TunnelMode  string `json:"tunnel_mode"`  // "sidecar" | "embed"
+	CredStore   string `json:"cred_store"`   // "keychain" | "dosya (0600)"
+	LLMEnabled  bool   `json:"llm_enabled"`  // danisman yapilandirilmis mi?
+	ERPNextMask bool   `json:"erpnext_mask"`
+	Plan        string `json:"plan"` // "" normal | "trial"
 }
 
 // Plan — yerel yuz "Plan/Yukselt" ekrani icin config (deneme durumu + talep kanali).
@@ -83,13 +100,14 @@ type Deps struct {
 	Plan           Plan
 	Version        string
 	TunnelStatus   func() (state, msg string)
+	Settings       SettingsInfo
 }
 
 func New(d Deps) *UI {
 	return &UI{man: d.Live, conn: d.Conn, aud: d.Aud, static: d.Static, apply: d.Apply,
 		adviser: d.Adviser, auth: newAuth(d.Password), dbConnect: d.DBConnect, reg: d.Registry,
 		erpnextConnect: d.ErpnextConnect, primaryLabel: d.PrimaryLabel, plan: d.Plan, version: d.Version,
-		tunnelStatus: d.TunnelStatus}
+		tunnelStatus: d.TunnelStatus, settings: d.Settings}
 }
 
 // connFor — istekteki ?conn=<label> bağlantısı (yoksa primary). Per-connection op scoping.
@@ -184,6 +202,7 @@ func (u *UI) Handler() http.Handler {
 	mux.HandleFunc("/onboard/export", u.gated(u.onboardExport))
 	mux.HandleFunc("/audit/log", u.gated(u.auditLog))
 	mux.HandleFunc("/plan", u.gated(u.planInfo))
+	mux.HandleFunc("/settings", u.gated(u.settingsHandler))
 	mux.HandleFunc("/", u.serveStatic) // SPA kabuk (acik — login ekrani yuklenebilsin)
 	return mux
 }
@@ -529,6 +548,31 @@ func (u *UI) auditLog(w http.ResponseWriter, r *http.Request) {
 // planInfo — satis yuzeyi config'i (Plan/Yukselt ekrani): deneme durumu + talep kanali. Sir YOK.
 func (u *UI) planInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, u.plan)
+}
+
+// settingsHandler — Ayarlar ekrani: GERCEK calisma-zamani config + CANLI tunel durumu. Salt-okur,
+// yazma ucu YOK (§4: sahte-duzenlenebilir toggle sunulmaz — env/kurulumla degisen alanlar
+// read-only gosterilir, ekran bunu kucuk bir notla belirtir).
+func (u *UI) settingsHandler(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]any{
+		"version":      u.settings.Version,
+		"web_addr":     u.settings.WebAddr,
+		"web_tls":      u.settings.WebTLS,
+		"auth_enabled": u.settings.AuthEnabled,
+		"tunnel_mode":  u.settings.TunnelMode,
+		"cred_store":   u.settings.CredStore,
+		"llm_enabled":  u.settings.LLMEnabled,
+		"erpnext_mask": u.settings.ERPNextMask,
+		"plan":         u.settings.Plan,
+	}
+	if u.tunnelStatus != nil {
+		st, msg := u.tunnelStatus()
+		resp["tunnel_state"] = st
+		if msg != "" {
+			resp["tunnel_msg"] = msg
+		}
+	}
+	writeJSON(w, 200, resp)
 }
 
 // serveStatic — gomulu SPA. Dosya varsa onu, yoksa index.html (client-side routing) sunar.

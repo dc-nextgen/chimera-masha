@@ -104,6 +104,22 @@ export type PlanInfo = {
   request_url: string
 }
 
+// Ayarlar (salt-okur) — GERÇEK çalışma-zamanı config (§4). Çoğu alan yalnız env/kurulumla değişir
+// (ekran bunu küçük bir notla belirtir; sahte-düzenlenebilir toggle YOK).
+export type Settings = {
+  version: string
+  web_addr: string
+  web_tls: boolean
+  auth_enabled: boolean
+  tunnel_mode: string // "sidecar" | "embed"
+  cred_store: string // "keychain" | "dosya (0600)"
+  llm_enabled: boolean
+  erpnext_mask: boolean
+  plan: string // "" (normal) | "trial"
+  tunnel_state?: string // "off" | "connecting" | "connected" | "conflict"
+  tunnel_msg?: string
+}
+
 // desteklenen expression seçenekleri (expression.Apply ile birebir).
 export const EXPRESSIONS = [
   '',
@@ -202,6 +218,7 @@ export const api = {
     return j<{ records: AuditRecord[] }>('/audit/log?' + p.toString())
   },
   plan: () => j<PlanInfo>('/plan'),
+  settings: () => j<Settings>('/settings'),
   authStatus: () => j<{ auth_required: boolean }>('/auth/status'),
   login: async (password: string): Promise<{ token: string }> => {
     // login açık uç: 401=parola yanlış (token temizleme mantığına sokma → net hata mesajı).

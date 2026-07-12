@@ -14,6 +14,68 @@ import (
 
 var reTCKN = regexp.MustCompile(`(tckn|tcno|tc_no|tc_kimlik|kimlikno|kimlik_no|vkn|vergino|vergi_no)`)
 
+// --- serbest-metin (free-text) PII maskeleme --------------------------------------------------
+//
+// MaskForField/mask alan ADI bilindiginde (SQL kolonu vb.) deterministik calisir. MaskText ise
+// KEYFI serbest metinde (dokuman icerigi) PII DESENI arar — bu HEURISTIKTIR, deterministik degil.
+// docs/pii-sanitizer.md ile ayni durustluk: recall garanti edilmez, sadece OLCULEBILIR olmasi
+// hedeflenir (bkz. setup/pii-eval). Asiri-maskelemeyi (over-masking) onlemek icin desenler
+// muhafazakar tutuldu (ör. 11 haneli TCKN checksum'suz kabul edilir — PoC icin yeterli, ama
+// yanlis-pozitif verebilir; checksum eklemek gelecek iyilestirme).
+var (
+	// TR IBAN: "TR" + 24 hane, aralarda bosluk olabilir.
+	reFreeIBAN = regexp.MustCompile(`\bTR\d{2}(?:[ ]?\d{4}){5}[ ]?\d{2}\b`)
+	// e-posta.
+	reFreeEmail = regexp.MustCompile(`\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b`)
+	// TR cep/sabit telefon: opsiyonel +90/0 + 10 hane (bosluk/tire ile ayrilmis olabilir).
+	reFreePhone = regexp.MustCompile(`\b(?:\+90|0)?[ \-]?5\d{2}[ \-]?\d{3}[ \-]?\d{2}[ \-]?\d{2}\b`)
+	// kredi karti: 13-19 hane, 4'erli gruplar halinde bosluk/tire ile ayrilmis olabilir.
+	reFreeCard = regexp.MustCompile(`\b(?:\d[ \-]?){12,18}\d\b`)
+	// TCKN: tam 11 ardisik hane (checksum yok — bkz. yorum yukarida).
+	reFreeTCKN = regexp.MustCompile(`\b\d{11}\b`)
+)
+
+// MaskText — serbest metindeki PII DESENLERINI (TCKN/IBAN/e-posta/telefon/kart) tespit edip ayni
+// maskeleme stilini (mask()) kullanarak degistirir. Masha "documents" connector'i (yerel dizin →
+// OWUI knowledge) buluta gitmeden once bunu cagirir (§3: veri on-prem kalir, PII-temiz baglam
+// gider). Siralama onemli: once daha spesifik/uzun desenler (IBAN, e-posta, kart), sonra TCKN —
+// aksi halde ör. bir IBAN icindeki 11 haneli alt-dizi yanlislikla TCKN sanilabilir.
+func MaskText(s string) string {
+	if s == "" {
+		return s
+	}
+	s = reFreeIBAN.ReplaceAllStringFunc(s, func(m string) string { return mask("iban", m) })
+	s = reFreeEmail.ReplaceAllStringFunc(s, func(m string) string { return mask("email", m) })
+	s = reFreeCard.ReplaceAllStringFunc(s, func(m string) string {
+		digits := digitsOnly(m)
+		if len(digits) < 13 || len(digits) > 19 || !luhnValid(digits) {
+			return m // Luhn gecmiyor => kart degil, dokunma (asiri-maskelemeyi onler).
+		}
+		return mask("card", m)
+	})
+	s = reFreePhone.ReplaceAllStringFunc(s, func(m string) string { return mask("phone", m) })
+	s = reFreeTCKN.ReplaceAllStringFunc(s, func(m string) string { return mask("tckn", m) })
+	return s
+}
+
+// luhnValid — kredi karti Luhn checksum. Sadece rakam icerdigi varsayilir (cagiran digitsOnly ile temizler).
+func luhnValid(digits string) bool {
+	sum := 0
+	alt := false
+	for i := len(digits) - 1; i >= 0; i-- {
+		d := int(digits[i] - '0')
+		if alt {
+			d *= 2
+			if d > 9 {
+				d -= 9
+			}
+		}
+		sum += d
+		alt = !alt
+	}
+	return sum%10 == 0
+}
+
 // MaskForField — alan/kolon ADINDAN PII maske ifadesi ("mask:email" vb.) ya da "". Heuristik (KESİN DEĞİL) —
 // onboard (DB manifest önerisi) + erpnext (generic doküman maskeleme) ortak kullanır (drift önlenir).
 func MaskForField(name string) string {

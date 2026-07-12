@@ -34,15 +34,19 @@ git checkout HEAD -- web/dist/.gitkeep 2>/dev/null || true
 # Sürüm damgası: MASHA_VERSION (elle override) > `git describe --tags --dirty` (tag'li commit → ör.
 # v0.2.0-3-gabc1234-dirty) > main.go default (damgasız — tag yoksa build-time -ldflags ATLANIR).
 V="${MASHA_VERSION:-$(git describe --tags --dirty 2>/dev/null || true)}"
+# CGO: darwin ZORUNLU (tray komutu fyne.io/systray → Cocoa cgo; diğer GOOS'larda cgo dosyaları
+# build-tag'li olduğu için CGO_ENABLED=0 ile de derlenir) — GOOS'a göre dallanır, diğer hedefler eskisi gibi statik.
+go_cgo(){ [ "$1" = "darwin" ] && echo 1 || echo 0; }
+
 if [ -n "$V" ]; then
   VERSION="$V"
-  go_build(){ CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -ldflags "-X main.version=$V" -o "$3" .; }
+  go_build(){ CGO_ENABLED="$(go_cgo "$1")" GOOS="$1" GOARCH="$2" go build -ldflags "-X main.version=$V" -o "$3" .; }
 else
   # Damgasız: main.go'daki `var version = "..."` default'u — binary GERÇEKTE bunu bildirecek, VERSION dosyası
   # ile TUTARLI olmalı → aynı satırdan çek (main.go'ya dokunmadan tek-kaynak korunur; grep boşsa hardcode fallback).
   VERSION="$(grep -m1 '^var version = ' main.go 2>/dev/null | sed -E 's/^var version = "([^"]*)".*/\1/')"
   VERSION="${VERSION:-0.1.0-beta.1}"
-  go_build(){ CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -o "$3" .; }
+  go_build(){ CGO_ENABLED="$(go_cgo "$1")" GOOS="$1" GOARCH="$2" go build -o "$3" .; }
 fi
 echo "$VERSION" > "$OUT_DIR/VERSION"
 

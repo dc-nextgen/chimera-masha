@@ -73,7 +73,7 @@ func (s *SidecarFrpc) inspectLine(line string) {
 	l := strings.ToLower(line)
 	switch {
 	case strings.Contains(l, "already exists"), strings.Contains(l, "already used"), strings.Contains(l, "already in use"):
-		s.setState("conflict", "Bu bağlantı slotu zaten BAŞKA bir makinede aktif — edge (frps) ikinci ajanı reddetti. Aynı kurulum paketi iki makinede aynı anda çalışamaz. Kasıtlı ikinci veri kaynağıysa Pota'dan AYRI bir bağlantı ekleyin (ayrı slot).")
+		s.setState("conflict", conflictMsg)
 	case strings.Contains(l, "start proxy success"):
 		s.setState("connected", "")
 	}
